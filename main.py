@@ -1,6 +1,8 @@
 """
 main.py
 """
+# Change the default path below or pass as argument
+CSV_FILE_DEFAULT_PATH = '/home/sheng/Projects/robodk_xray/csv_files/Example-XYZWPR-Duration_simple.csv'
 
 import os
 import argparse
@@ -38,7 +40,7 @@ def parse_args():
     '''
     parser = argparse.ArgumentParser(description="A RoboDK project")
     parser.add_argument("--csv_file", 
-                        default='/home/sheng/Projects/robodk_xray/csv_files/Example-XYZWPR-Duration_simple.csv', 
+                        default=CSV_FILE_DEFAULT_PATH, 
                         type=str, help="Path to the CSV file")
     args = parser.parse_args()
     return args
