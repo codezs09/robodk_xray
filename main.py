@@ -12,17 +12,34 @@ from robodk.robodialogs import *
 from robodk.robofileio import *
 
 # Declare ROBOT and RDK as global variables
-ROBOT = None
-RDK = None
-FRAME = None
-TOOL = None
+# Start communication with RoboDK
+RDK = Robolink()
+
+# Ask the user to select the robot (ignores the popup if only
+ROBOT = RDK.ItemUserPick('Select a robot', ITEM_TYPE_ROBOT)
+
+# Check if the user selected a robot
+if not ROBOT.Valid():
+    quit()
+
+# Automatically retrieve active reference and tool
+FRAME = ROBOT.getLink(ITEM_TYPE_FRAME)
+TOOL = ROBOT.getLink(ITEM_TYPE_TOOL)
+
+#FRAME = RDK.ItemUserPick('Select a reference frame', ITEM_TYPE_FRAME)
+#TOOL = RDK.ItemUserPick('Select a tool', ITEM_TYPE_TOOL)
+
+if not FRAME.Valid() or not TOOL.Valid():
+    raise Exception("Select appropriate FRAME and TOOL references")
 
 def parse_args():
     '''
     Pass arguments of the csv file path when calling the python script. 
     '''
     parser = argparse.ArgumentParser(description="A RoboDK project")
-    parser.add_argument("--csv_file", required=True, type=str, help="Path to the CSV file")
+    parser.add_argument("--csv_file", 
+                        default='/home/sheng/Projects/robodk_xray/csv_files/Example-XYZWPR-Duration_simple.csv', 
+                        type=str, help="Path to the CSV file")
     args = parser.parse_args()
     return args
 
@@ -48,37 +65,11 @@ def load_task(csv_file):
     print(f"Loaded {len(tasks)} tasks from {csv_file}!")
     return tasks
 
-def init_robot():
-    '''
-    Set up the robot and the environment
-    '''
-    global RDK, ROBOT, FRAME, TOOL # Declare global variables
-
-    # Start communication with RoboDK
-    RDK = Robolink()    
-    # Ask the user to select the robot (ignores the popup if only
-    ROBOT = RDK.ItemUserPick('Select a robot', ITEM_TYPE_ROBOT)
-
-    # Check if the user selected a robot
-    if not ROBOT.Valid():
-        quit()
-
-    # Automatically retrieve active reference and tool
-    FRAME = ROBOT.getLink(ITEM_TYPE_FRAME)
-    TOOL = ROBOT.getLink(ITEM_TYPE_TOOL)
-
-    if not FRAME.Valid() or not TOOL.Valid():
-        raise Exception("Select appropriate FRAME and TOOL references")
-    
-    ROBOT.setFrame(FRAME)
-    ROBOT.setTool(TOOL)
-
 def TurnXrayBeamOn(beam_on):
     # TO-DO: set x-ray beam IO to true
     pass
 
 def _execute_task_GUI(tasks): 
-    global RDK, ROBOT, FRAME, TOOL # Declare global variables
     program_name = (args.csv_file)
     program_name = program_name.replace('-', '_').replace(' ', '_')
     program = RDK.Item(program_name, ITEM_TYPE_PROGRAM)
@@ -88,6 +79,7 @@ def _execute_task_GUI(tasks):
     program.setFrame(FRAME)
     program.setTool(TOOL)
     ROBOT.MoveJ(ROBOT.JointsHome())
+
     for i, task in enumerate(tasks):
         name = '%s-%i' % (program_name, i)
         target = RDK.Item(name, ITEM_TYPE_TARGET)
@@ -102,10 +94,9 @@ def _execute_task_GUI(tasks):
             print('Warning: %s can not be reached. It will not be added to the program' % name)
         TurnXrayBeamOn(True)
         pause(task["duration"] / 1000.0)    # ms to s
-        TurnXrayBeamOff(False)
+        TurnXrayBeamOn(False)
 
 def _execute_task_move(tasks):
-    global RDK, ROBOT, FRAME, TOOL # Declare global variables
     ROBOT.setFrame(FRAME)
     ROBOT.setTool(TOOL)
 
@@ -117,15 +108,16 @@ def _execute_task_move(tasks):
             RDK.ShowMessage('Target %i can not be reached' % i, False)
         TurnXrayBeamOn(True)
         pause(task["duration"] / 1000.0)    # ms to s
-        TurnXrayBeamOff(False)
+        TurnXrayBeamOn(False)
 
 def execute_task(tasks):
     '''
     Execute the tasks for the ROBOT
     '''
-    global RDK, ROBOT, FRAME, TOOL # Declare global variables
-
     MAKE_GUI_PROGRAM = False
+
+    ROBOT.setFrame(FRAME)
+    ROBOT.setTool(TOOL)
 
     if RDK.RunMode() == RUNMODE_SIMULATE:
         MAKE_GUI_PROGRAM = True
@@ -134,17 +126,19 @@ def execute_task(tasks):
         # if we run in program generation mode just move the robot
         MAKE_GUI_PROGRAM = False
 
+    MAKE_GUI_PROGRAM = False
+
     if MAKE_GUI_PROGRAM:
+        print("debug 1")
         RDK.Render(False)  # Faster if we turn render off
-        _execute_task_GUI(csv_file)
+        _execute_task_GUI(tasks)
     else:
-        _execute_task_move(csv_file)
+        print("debug 2")
+        _execute_task_move(tasks)
 
 def run():
     tasks = load_task(args.csv_file)
-    init_robot()
     execute_task(tasks)
-
 
 if __name__ == "__main__":
     args = parse_args()
